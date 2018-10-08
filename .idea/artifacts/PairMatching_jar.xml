@@ -1,0 +1,11 @@
+<component name="ArtifactManager">
+  <artifact name="PairMatching:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/PairMatching_jar</output-path>
+    <root id="root">
+      <element id="archive" name="PairMatching.jar">
+        <element id="module-output" name="PairMatching" />
+      </element>
+      <element id="library" level="project" name="spark" />
+    </root>
+  </artifact>
+</component>
