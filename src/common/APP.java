@@ -85,7 +85,7 @@ public class APP {
         });
 
         // Reduce
-        JavaRDD<Tuple2<Tuple2<Integer, Integer>, Double>> overlap = allCandidate.reduceByKey((a, b) -> a + b).flatMapToPair(p -> {
+        JavaPairRDD<Tuple2<Integer, Integer>, Double> overlap = allCandidate.reduceByKey((a, b) -> a + b).flatMapToPair(p -> {
             ArrayList<Tuple2<Tuple2<Integer, Integer>, Double>> result = new ArrayList<>();
             int countA = p._1()._1()._2(), countB = p._1()._2()._2();
             double union = 0.0F + countA + countB - p._2();
@@ -93,7 +93,7 @@ public class APP {
                 result.add(new Tuple2<>(new Tuple2<>(p._1()._1()._1(), p._1()._2()._1()), p._2() / union));
             }
             return result.iterator();
-        }).subtractByKey(isFriend).map(p -> new Tuple2<>(p._1(), p._2()));
+        }).subtractByKey(isFriend);//.map(p -> new Tuple2<>(p._1(), p._2()));
         //JavaRDD<Tuple2<Tuple2<Integer, Integer>, Double>> sortedOverlap = overlap.sortBy(new AlphaComparator(), true, 4);
 
         for (Tuple2<Tuple2<Integer, Integer>, Double> candidate : overlap.collect()) {
