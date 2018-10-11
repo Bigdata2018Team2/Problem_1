@@ -101,7 +101,7 @@ public class APP {
         JavaRDD<Tuple2<Tuple2<Integer, Integer>, Double>> sortedOverlap = overlap.sortBy(new AlphaComparator(), true, 2);
 
         for (Tuple2<Tuple2<Integer, Integer>, Double> candidate : sortedOverlap.collect()) {
-            System.out.println(candidate._2() + "\t" + candidate._1()._1() + "\t" + candidate._1()._2());
+            System.out.println(candidate._1()._1() + "\t" + candidate._1()._2());
         }
     }
 }
