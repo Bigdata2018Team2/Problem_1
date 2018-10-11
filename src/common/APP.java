@@ -98,7 +98,7 @@ public class APP {
             }
             return result.iterator();
         }).subtractByKey(isFriend).map(p -> new Tuple2<>(p._1(), p._2()));
-        JavaRDD<Tuple2<Tuple2<Integer, Integer>, Double>> sortedOverlap = overlap.sortBy(new AlphaComparator(), true, 2);
+        JavaRDD<Tuple2<Tuple2<Integer, Integer>, Double>> sortedOverlap = overlap.sortBy(new AlphaComparator(), true, 4);
 
         for (Tuple2<Tuple2<Integer, Integer>, Double> candidate : sortedOverlap.collect()) {
             System.out.println(candidate._1()._1() + "\t" + candidate._1()._2());
