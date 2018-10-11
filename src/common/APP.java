@@ -19,19 +19,16 @@ public class APP {
 
         JavaRDD<String> data = jsc.textFile(args[0]);
         double THRESHOLD = Double.parseDouble(args[1]);
-        //System.out.println("Start Calculating with threshold " + THRESHOLD + "\nFile: " + args[0]);
-
-        JavaPairRDD<Integer, Integer> pairs = data.mapToPair(l -> {
-            String[] f = l.split("\t");
-            return new Tuple2<>(Integer.parseInt(f[0]), Integer.parseInt(f[1]));
-        });
 
         // Duplicate the pair to make friends relationship table
-        JavaPairRDD<Integer, Integer> dPairs = pairs.flatMapToPair(g -> {
+        JavaPairRDD<Integer, Integer> dPairs = data.flatMapToPair(l -> {
             ArrayList<Tuple2<Integer, Integer>> result = new ArrayList<>();
+            String[] f = l.split("\t");
+            int a = Integer.parseInt(f[0]);
+            int b = Integer.parseInt(f[1]);
 
-            result.add(new Tuple2<>(g._1(), g._2()));
-            result.add(new Tuple2<>(g._2(), g._1()));
+            result.add(new Tuple2<>(a, b));
+            result.add(new Tuple2<>(b, a));
 
             return result.iterator();
         });
@@ -93,14 +90,13 @@ public class APP {
             int countA = p._1()._1()._2(), countB = p._1()._2()._2();
             double union = 0.0F + countA + countB - p._2();
             if (union * THRESHOLD <= p._2()) {
-                double jaccard = p._2() / union;
-                result.add(new Tuple2<>(new Tuple2<>(p._1()._1()._1(), p._1()._2()._1()), jaccard));
+                result.add(new Tuple2<>(new Tuple2<>(p._1()._1()._1(), p._1()._2()._1()), p._2() / union));
             }
             return result.iterator();
         }).subtractByKey(isFriend).map(p -> new Tuple2<>(p._1(), p._2()));
-        JavaRDD<Tuple2<Tuple2<Integer, Integer>, Double>> sortedOverlap = overlap.sortBy(new AlphaComparator(), true, 4);
+        //JavaRDD<Tuple2<Tuple2<Integer, Integer>, Double>> sortedOverlap = overlap.sortBy(new AlphaComparator(), true, 4);
 
-        for (Tuple2<Tuple2<Integer, Integer>, Double> candidate : sortedOverlap.collect()) {
+        for (Tuple2<Tuple2<Integer, Integer>, Double> candidate : overlap.collect()) {
             System.out.println(candidate._1()._1() + "\t" + candidate._1()._2());
         }
     }
