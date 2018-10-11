@@ -19,12 +19,14 @@ public class APP {
 
         JavaRDD<String> data = jsc.textFile(args[0]);
         double THRESHOLD = Double.parseDouble(args[1]);
-        System.out.println("Start Calculating with threshold " + THRESHOLD + "\nFile: " + args[0]);
+        //System.out.println("Start Calculating with threshold " + THRESHOLD + "\nFile: " + args[0]);
 
         JavaPairRDD<Integer, Integer> pairs = data.mapToPair(l -> {
             String[] f = l.split("\t");
             return new Tuple2<>(Integer.parseInt(f[0]), Integer.parseInt(f[1]));
         });
+
+        // Duplicate the pair to make friends relationship table
         JavaPairRDD<Integer, Integer> dPairs = pairs.flatMapToPair(g -> {
             ArrayList<Tuple2<Integer, Integer>> result = new ArrayList<>();
 
@@ -34,7 +36,11 @@ public class APP {
             return result.iterator();
         });
 
+        JavaPairRDD<Tuple2<Integer, Integer>, Boolean> isFriend = dPairs.mapToPair(p -> new Tuple2<>(new Tuple2<>(p._1(), p._2()), true));
 
+
+        // Contains all relationship of each user
+        // ex) A -> B, C, D ...
         JavaPairRDD<Integer, ArrayList<Integer>> table = dPairs.groupByKey().mapToPair(g -> {
             ArrayList<Integer> friends = new ArrayList<>();
             for (Integer f : g._2())
@@ -42,6 +48,8 @@ public class APP {
             return new Tuple2<>(g._1(), friends);
         });
 
+        // Invert table. And each record in column contain their number of friends
+        // ex) A -> (B, 2), (C, 3) ...
         JavaPairRDD<Integer, ArrayList<Tuple2<Integer, Integer>>> invertedTable = table.flatMapToPair(c -> {
             ArrayList<Tuple2<Integer, Tuple2<Integer, Integer>>> result = new ArrayList<>();
             Integer id = c._1();
@@ -66,27 +74,34 @@ public class APP {
             int size = p._2().size();
             for (int i = 0; i < size - 1; ++i) {
                 for (int j = i + 1; j < size; ++j) {
-                    Tuple2<Integer, Integer> key1 = new Tuple2<>(p._2().get(i)._1(), p._2().get(i)._2());
-                    Tuple2<Integer, Integer> key2 = new Tuple2<>(p._2().get(j)._1(), p._2().get(i)._2());
-                    result.add(new Tuple2<>(new Tuple2<>(key1, key2), 1));
+                    Tuple2<Integer, Integer> a1 = p._2().get(i);
+                    Tuple2<Integer, Integer> a2 = p._2().get(j);
+                    Tuple2<Integer, Integer> key1 = new Tuple2<>(a1._1(), a1._2());
+                    Tuple2<Integer, Integer> key2 = new Tuple2<>(a2._1(), a2._2());
+                    result.add(a1._1() > a2._1()
+                            ? new Tuple2<>(new Tuple2<>(key2, key1), 1)
+                            : new Tuple2<>(new Tuple2<>(key1, key2), 1)
+                    );
                 }
             }
             return result.iterator();
         });
 
         // Reduce
-        JavaPairRDD<Tuple2<Tuple2<Integer, Integer>, Tuple2<Integer, Integer>>, Integer> overlapCount = allCandidate.reduceByKey((a, b) -> a + b);
-        JavaRDD<Tuple2<Integer, Integer>> overlap = overlapCount.filter(g -> {
-            int countA = g._1()._1()._2(), countB = g._1()._2()._2();
-            double theta = THRESHOLD / (1 + THRESHOLD) * (countA + countB);
-            return g._2() >= theta;
-        }).mapToPair(g -> g._1()._1()._1() > g._1()._2()._1() ?
-                new Tuple2<>(g._1()._2()._1(), g._1()._1()._1()) : new Tuple2<>(g._1()._1()._1(), g._1()._2()._1())
-                ).subtractByKey(pairs).map(p -> new Tuple2<>(p._1(), p._2()));
-        JavaRDD<Tuple2<Integer, Integer>> sortedOverlap = overlap.sortBy(new TupleComparator(), true, 2);
+        JavaRDD<Tuple2<Tuple2<Integer, Integer>, Double>> overlap = allCandidate.reduceByKey((a, b) -> a + b).flatMapToPair(p -> {
+            ArrayList<Tuple2<Tuple2<Integer, Integer>, Double>> result = new ArrayList<>();
+            int countA = p._1()._1()._2(), countB = p._1()._2()._2();
+            double union = 0.0F + countA + countB - p._2();
+            if (union * THRESHOLD <= p._2()) {
+                double jaccard = p._2() / union;
+                result.add(new Tuple2<>(new Tuple2<>(p._1()._1()._1(), p._1()._2()._1()), jaccard));
+            }
+            return result.iterator();
+        }).subtractByKey(isFriend).map(p -> new Tuple2<>(p._1(), p._2()));
+        JavaRDD<Tuple2<Tuple2<Integer, Integer>, Double>> sortedOverlap = overlap.sortBy(new AlphaComparator(), true, 2);
 
-        for (Tuple2<Integer, Integer> candidate : sortedOverlap.collect()) {
-            System.out.println(candidate._1() + "\t" + candidate._2());
+        for (Tuple2<Tuple2<Integer, Integer>, Double> candidate : sortedOverlap.collect()) {
+            System.out.println(candidate._2() + "\t" + candidate._1()._1() + "\t" + candidate._1()._2());
         }
     }
 }
