@@ -4,10 +4,12 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.storage.StorageLevel;
 import scala.Tuple2;
 
 import java.util.ArrayList;
+import java.util.Map;
 
 public class APP {
     public static void main(String[] args) {
@@ -45,7 +47,7 @@ public class APP {
         });
 
         JavaPairRDD<Integer, Integer> countTable = table.mapToPair(p -> new Tuple2<>(p._1(), p._2().size()));
-        countTable.persist(StorageLevel.DISK_ONLY());
+        Broadcast<Map<Integer, Integer>> bCount =  jsc.broadcast(countTable.collectAsMap());
 //        JavaPairRDD<Tuple2<Integer, Integer>, Tuple2<Integer, Integer>> pairCountTable = countTable.cartesian(countTable)
 //                .filter(p -> p._1()._1() < p._2()._2())
 //                .mapToPair(p -> new Tuple2<>(new Tuple2<>(p._1()._1(), p._2()._1()), new Tuple2<>(p._1()._2(), p._2()._2())));
@@ -72,7 +74,7 @@ public class APP {
                 .flatMapToPair(p -> {
                     ArrayList<Tuple2<Tuple2<Integer, Integer>, Double>> result = new ArrayList<>();
                     Tuple2<Integer, Integer> keyPair = p._1();
-                    int countA = countTable.lookup(p._1()._1()).get(0), countB = countTable.lookup(p._1()._2()).get(0);
+                    int countA = bCount.getValue().get(p._1()._1()), countB = bCount.getValue().get(p._1()._2());
                     int common = p._2();
 
                     double union = 0.0F + countA + countB - common;
