@@ -4,6 +4,7 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.storage.StorageLevel;
 import scala.Tuple2;
 
 import java.util.ArrayList;
@@ -44,9 +45,10 @@ public class APP {
         });
 
         JavaPairRDD<Integer, Integer> countTable = table.mapToPair(p -> new Tuple2<>(p._1(), p._2().size()));
-        JavaPairRDD<Tuple2<Integer, Integer>, Tuple2<Integer, Integer>> pairCountTable = countTable.cartesian(countTable)
-                .filter(p -> p._1()._1() > p._2()._2())
-                .mapToPair(p -> new Tuple2<>(new Tuple2<>(p._1()._1(), p._2()._1()), new Tuple2<>(p._1()._2(), p._2()._2())));
+        countTable.persist(StorageLevel.DISK_ONLY());
+//        JavaPairRDD<Tuple2<Integer, Integer>, Tuple2<Integer, Integer>> pairCountTable = countTable.cartesian(countTable)
+//                .filter(p -> p._1()._1() < p._2()._2())
+//                .mapToPair(p -> new Tuple2<>(new Tuple2<>(p._1()._1(), p._2()._1()), new Tuple2<>(p._1()._2(), p._2()._2())));
 
         // Map
         JavaPairRDD<Tuple2<Integer, Integer>, Integer> allCandidate = table.flatMapToPair(p -> {
@@ -66,12 +68,12 @@ public class APP {
 
         // Reduce
         JavaPairRDD<Tuple2<Integer, Integer>, Double> overlap = allCandidate.reduceByKey((a, b) -> a + b)
-                .join(pairCountTable)
+//                .join(pairCountTable)
                 .flatMapToPair(p -> {
                     ArrayList<Tuple2<Tuple2<Integer, Integer>, Double>> result = new ArrayList<>();
                     Tuple2<Integer, Integer> keyPair = p._1();
-                    int countA = p._2()._2()._1(), countB = p._2()._2()._2();
-                    int common = p._2()._1();
+                    int countA = countTable.lookup(p._1()._1()).get(0), countB = countTable.lookup(p._1()._2()).get(0);
+                    int common = p._2();
 
                     double union = 0.0F + countA + countB - common;
                     if (union * THRESHOLD <= common) {
